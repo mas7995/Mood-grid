@@ -1,0 +1,64 @@
+import { MOODS, MOOD_BY_KEY, MONTH_NAMES } from "../moods.js";
+
+// Streaks + the monthly recap — the "data talking back to you" view.
+export default function Recap({ stats }) {
+  if (!stats) return null;
+  const { currentStreak, longestStreak, recap } = stats;
+  const { counts, total, daysInMonth, topMood, positivityRatio, priorTopMood, month, year } =
+    recap;
+
+  let summary;
+  if (total === 0) {
+    summary = `No days logged yet in ${MONTH_NAMES[month]}. Tonight's a good place to start.`;
+  } else {
+    const top = MOOD_BY_KEY[topMood]?.label ?? "—";
+    const changed =
+      priorTopMood && priorTopMood !== topMood
+        ? `, up from ${MOOD_BY_KEY[priorTopMood]?.label} last month`
+        : "";
+    summary = `You logged ${total} of ${daysInMonth} days. Your most common mood was ${top}${changed}.`;
+  }
+
+  return (
+    <section className="recap-card">
+      <div className="streaks">
+        <div className="streak">
+          <span className="streak-num">{currentStreak}</span>
+          <span className="streak-label">current streak</span>
+        </div>
+        <div className="streak">
+          <span className="streak-num">{longestStreak}</span>
+          <span className="streak-label">longest streak</span>
+        </div>
+        <div className="streak">
+          <span className="streak-num">{positivityRatio}%</span>
+          <span className="streak-label">positivity this month</span>
+        </div>
+      </div>
+
+      <h3>
+        {MONTH_NAMES[month]} {year}
+      </h3>
+      <p className="recap-summary">{summary}</p>
+
+      <div className="recap-bars">
+        {MOODS.map((m) => {
+          const c = counts[m.key] || 0;
+          const pct = total ? Math.round((c / total) * 100) : 0;
+          return (
+            <div className="recap-row" key={m.key}>
+              <span className="recap-name">{m.label}</span>
+              <span className="recap-track">
+                <span
+                  className="recap-fill"
+                  style={{ width: `${pct}%`, background: m.color }}
+                />
+              </span>
+              <span className="recap-count">{c}</span>
+            </div>
+          );
+        })}
+      </div>
+    </section>
+  );
+}
