@@ -78,7 +78,9 @@ export default function Today({ date, entry, onSave, onChangeDate }) {
             onClick={() => pick(m.key)}
             title={m.label}
           >
-            <span className="dot" style={{ background: m.color }} />
+            <span className="dot" style={{ background: m.color }}>
+              {m.emoji}
+            </span>
             <span className="mood-label">{m.label}</span>
           </button>
         ))}

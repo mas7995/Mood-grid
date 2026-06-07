@@ -11,10 +11,12 @@ export default function Recap({ stats }) {
   if (total === 0) {
     summary = `No days logged yet in ${MONTH_NAMES[month]}. Tonight's a good place to start.`;
   } else {
-    const top = MOOD_BY_KEY[topMood]?.label ?? "—";
+    const top = MOOD_BY_KEY[topMood]
+      ? `${MOOD_BY_KEY[topMood].emoji} ${MOOD_BY_KEY[topMood].label}`
+      : "—";
     const changed =
       priorTopMood && priorTopMood !== topMood
-        ? `, up from ${MOOD_BY_KEY[priorTopMood]?.label} last month`
+        ? `, up from ${MOOD_BY_KEY[priorTopMood]?.emoji} ${MOOD_BY_KEY[priorTopMood]?.label} last month`
         : "";
     summary = `You logged ${total} of ${daysInMonth} days. Your most common mood was ${top}${changed}.`;
   }
@@ -47,7 +49,9 @@ export default function Recap({ stats }) {
           const pct = total ? Math.round((c / total) * 100) : 0;
           return (
             <div className="recap-row" key={m.key}>
-              <span className="recap-name">{m.label}</span>
+              <span className="recap-name">
+                <span className="recap-emoji">{m.emoji}</span> {m.label}
+              </span>
               <span className="recap-track">
                 <span
                   className="recap-fill"
