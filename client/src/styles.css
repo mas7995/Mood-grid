@@ -464,10 +464,14 @@ button {
 
 .recap-row {
   display: grid;
-  grid-template-columns: 110px 1fr 40px;
+  grid-template-columns: 138px 1fr 36px;
   align-items: center;
   gap: 0.6rem;
   font-size: 0.88rem;
+}
+
+.recap-name {
+  white-space: nowrap;
 }
 
 .recap-track {
@@ -489,11 +493,135 @@ button {
   color: var(--muted);
 }
 
+/* ---------- Habits (Today) ---------- */
+.habits {
+  margin-top: 1.5rem;
+  border-top: 1px solid var(--line);
+  padding-top: 1.2rem;
+}
+
+.habits-title {
+  margin: 0 0 0.75rem;
+  font-size: 1rem;
+  text-align: center;
+}
+
+.habit-group {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  justify-content: center;
+  margin-bottom: 0.6rem;
+}
+
+.habit-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  border: 1.5px solid var(--line);
+  background: #fff;
+  border-radius: 999px;
+  padding: 0.45rem 0.8rem;
+  font-size: 0.85rem;
+  color: var(--ink);
+  cursor: pointer;
+  transition: border-color 0.15s, background 0.15s, transform 0.08s;
+}
+
+.habit-btn:active {
+  transform: scale(0.96);
+}
+
+.habit-emoji {
+  font-size: 1.05rem;
+}
+
+.habit-btn.pos.on {
+  border-color: #2e9b4f;
+  background: #e8f6ed;
+}
+
+.habit-btn.neg.on {
+  border-color: #e0473e;
+  background: #fdeceb;
+}
+
+.habits-hint {
+  text-align: center;
+  color: var(--muted);
+  font-size: 0.8rem;
+  margin: 0.4rem 0 0;
+}
+
+/* ---------- Insights (Recap) ---------- */
+.insights {
+  margin-top: 1.5rem;
+  border-top: 1px solid var(--line);
+  padding-top: 1.2rem;
+}
+
+.insights h3 {
+  margin: 0 0 0.75rem;
+}
+
+.insights-empty {
+  color: var(--muted);
+  font-size: 0.88rem;
+  margin: 0;
+}
+
+.insight-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+}
+
+.insight-row {
+  display: grid;
+  grid-template-columns: 130px 1fr auto;
+  align-items: center;
+  gap: 0.6rem;
+  font-size: 0.85rem;
+}
+
+.insight-name {
+  white-space: nowrap;
+  font-weight: 600;
+}
+
+.insight-delta {
+  font-weight: 700;
+  border-radius: 999px;
+  padding: 0.15rem 0.5rem;
+  font-size: 0.8rem;
+}
+
+.insight-delta.up {
+  color: #1f7a3d;
+  background: #e8f6ed;
+}
+
+.insight-delta.down {
+  color: #c0392b;
+  background: #fdeceb;
+}
+
 @media (max-width: 520px) {
   .mood-circles {
     grid-template-columns: repeat(2, 1fr);
   }
   .recap-row {
-    grid-template-columns: 90px 1fr 32px;
+    grid-template-columns: 124px 1fr 30px;
+    font-size: 0.82rem;
+  }
+  .insight-row {
+    grid-template-columns: 1fr auto;
+    row-gap: 0.2rem;
+  }
+  .insight-name {
+    grid-column: 1 / -1;
   }
 }

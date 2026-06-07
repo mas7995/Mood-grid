@@ -3,7 +3,7 @@ import { MOODS, MOOD_BY_KEY, MONTH_NAMES } from "../moods.js";
 // Streaks + the monthly recap — the "data talking back to you" view.
 export default function Recap({ stats }) {
   if (!stats) return null;
-  const { currentStreak, longestStreak, recap } = stats;
+  const { currentStreak, longestStreak, recap, habits = [] } = stats;
   const { counts, total, daysInMonth, topMood, positivityRatio, priorTopMood, month, year } =
     recap;
 
@@ -62,6 +62,40 @@ export default function Recap({ stats }) {
             </div>
           );
         })}
+      </div>
+
+      <div className="insights">
+        <h3>What's moving your mood</h3>
+        {habits.length === 0 ? (
+          <p className="insights-empty">
+            Keep checking off your habits each day. After about a week, you'll see
+            which ones tend to lift your mood — and which drag it down.
+          </p>
+        ) : (
+          <ul className="insight-list">
+            {habits.map((h) => {
+              // A "good" signal means the habit lines up with feeling good:
+              // positive habits with a higher delta, negative habits with a lower one.
+              const good = h.positive ? h.delta >= 0 : h.delta <= 0;
+              const sign = h.delta > 0 ? "+" : "";
+              return (
+                <li className="insight-row" key={h.key}>
+                  <span className="insight-name">
+                    {h.emoji} {h.label}
+                  </span>
+                  <span className="insight-text">
+                    felt good <strong>{h.withPositivity}%</strong> of days you did
+                    it · <span className="muted">{h.withoutPositivity}% otherwise</span>
+                  </span>
+                  <span className={"insight-delta " + (good ? "up" : "down")}>
+                    {sign}
+                    {h.delta}
+                  </span>
+                </li>
+              );
+            })}
+          </ul>
+        )}
       </div>
     </section>
   );

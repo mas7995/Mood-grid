@@ -42,8 +42,8 @@ export default function App() {
     loadStats(year, recapMonth).catch(() => {});
   }, [user, year, recapMonth, loadStats]);
 
-  async function handleSave(date, mood, note) {
-    const saved = await api.saveEntry(date, mood, note);
+  async function handleSave(date, mood, note, activities) {
+    const saved = await api.saveEntry(date, mood, note, activities);
     setEntriesByDate((prev) => {
       const next = { ...prev };
       if (saved) next[date] = saved;

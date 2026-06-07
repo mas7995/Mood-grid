@@ -26,7 +26,8 @@ export const api = {
   login: (name, pin) => request("POST", "/api/login", { name, pin }),
   logout: () => request("POST", "/api/logout"),
   entries: (year) => request("GET", `/api/entries?year=${year}`),
-  saveEntry: (date, mood, note) => request("PUT", `/api/entries/${date}`, { mood, note }),
+  saveEntry: (date, mood, note, activities) =>
+    request("PUT", `/api/entries/${date}`, { mood, note, activities }),
   stats: (year, month) =>
     request("GET", `/api/stats?year=${year}&month=${month}`),
 };

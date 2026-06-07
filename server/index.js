@@ -15,6 +15,20 @@ const isProd = process.env.NODE_ENV === "production";
 
 // The six moods are the single source of truth for what the server will accept.
 const MOOD_KEYS = ["happy", "content", "neutral", "sad", "angry", "overwhelmed"];
+const POSITIVE_MOODS = ["happy", "content"];
+
+// Daily habit check-ins (must mirror the client's activities list).
+const ACTIVITIES = [
+  { key: "exercise", label: "Exercised", emoji: "🏃", positive: true },
+  { key: "steps", label: "10k steps", emoji: "👟", positive: true },
+  { key: "sleptWell", label: "Slept well", emoji: "😴", positive: true },
+  { key: "wokeOnTime", label: "Woke on time", emoji: "⏰", positive: true },
+  { key: "ateWell", label: "Ate well", emoji: "🥗", positive: true },
+  { key: "outdoors", label: "Time outside", emoji: "🌳", positive: true },
+  { key: "alcohol", label: "Alcohol", emoji: "🍷", positive: false },
+  { key: "junkFood", label: "Junk food", emoji: "🍔", positive: false },
+];
+const ACTIVITY_KEYS = ACTIVITIES.map((a) => a.key);
 
 app.use(express.json());
 app.use(cookieParser());
@@ -54,6 +68,16 @@ function ymd(date) {
 
 function isValidDateStr(s) {
   return /^\d{4}-\d{2}-\d{2}$/.test(s) && !Number.isNaN(Date.parse(s));
+}
+
+function serializeEntry(e) {
+  return {
+    date: ymd(e.entryDate),
+    mood: e.mood,
+    note: e.note,
+    activities: e.activities || [],
+    updatedAt: e.updatedAt,
+  };
 }
 
 // ---------- Profile + auth routes ----------
@@ -117,14 +141,7 @@ app.get("/api/entries", auth, ah(async (req, res) => {
     where: { userId: req.user.uid, entryDate: { gte: start, lt: end } },
     orderBy: { entryDate: "asc" },
   });
-  res.json(
-    entries.map((e) => ({
-      date: ymd(e.entryDate),
-      mood: e.mood,
-      note: e.note,
-      updatedAt: e.updatedAt,
-    }))
-  );
+  res.json(entries.map(serializeEntry));
 }));
 
 app.get("/api/entries/:date", auth, ah(async (req, res) => {
@@ -134,34 +151,48 @@ app.get("/api/entries/:date", auth, ah(async (req, res) => {
     where: { userId_entryDate: { userId: req.user.uid, entryDate: new Date(date) } },
   });
   if (!entry) return res.json(null);
-  res.json({ date: ymd(entry.entryDate), mood: entry.mood, note: entry.note });
+  res.json(serializeEntry(entry));
 }));
 
-// Upsert a day's mood (and optional note). A null/empty mood clears the day.
+// Upsert a day's mood, optional note, and habit check-ins. A day with no mood,
+// no note, and no activities is removed entirely.
 app.put("/api/entries/:date", auth, ah(async (req, res) => {
   const { date } = req.params;
   if (!isValidDateStr(date)) return res.status(400).json({ error: "Bad date." });
   if (new Date(date) > new Date()) {
     return res.status(400).json({ error: "You can't log a day in the future." });
   }
-  const { mood, note } = req.body || {};
+  const { mood, note, activities } = req.body || {};
 
-  if (mood == null || mood === "") {
-    await prisma.entry
-      .delete({ where: { userId_entryDate: { userId: req.user.uid, entryDate: new Date(date) } } })
-      .catch(() => {}); // deleting a day that isn't logged is a no-op
-    return res.json(null);
-  }
-  if (!MOOD_KEYS.includes(mood)) {
+  const cleanMood = mood == null || mood === "" ? null : mood;
+  if (cleanMood && !MOOD_KEYS.includes(cleanMood)) {
     return res.status(400).json({ error: "Unknown mood." });
   }
   const cleanNote = note ? String(note).slice(0, 280) : null;
+  const cleanActivities = Array.isArray(activities)
+    ? [...new Set(activities.filter((a) => ACTIVITY_KEYS.includes(a)))]
+    : [];
+
+  // Nothing logged for the day → make sure no stray row lingers.
+  if (!cleanMood && !cleanNote && cleanActivities.length === 0) {
+    await prisma.entry
+      .delete({ where: { userId_entryDate: { userId: req.user.uid, entryDate: new Date(date) } } })
+      .catch(() => {});
+    return res.json(null);
+  }
+
   const entry = await prisma.entry.upsert({
     where: { userId_entryDate: { userId: req.user.uid, entryDate: new Date(date) } },
-    update: { mood, note: cleanNote },
-    create: { userId: req.user.uid, entryDate: new Date(date), mood, note: cleanNote },
+    update: { mood: cleanMood, note: cleanNote, activities: cleanActivities },
+    create: {
+      userId: req.user.uid,
+      entryDate: new Date(date),
+      mood: cleanMood,
+      note: cleanNote,
+      activities: cleanActivities,
+    },
   });
-  res.json({ date: ymd(entry.entryDate), mood: entry.mood, note: entry.note });
+  res.json(serializeEntry(entry));
 }));
 
 // ---------- Stats: streaks + monthly recap ----------
@@ -172,7 +203,7 @@ app.get("/api/stats", auth, ah(async (req, res) => {
 
   const all = await prisma.entry.findMany({
     where: { userId: req.user.uid },
-    select: { entryDate: true, mood: true },
+    select: { entryDate: true, mood: true, activities: true },
     orderBy: { entryDate: "asc" },
   });
 
@@ -243,7 +274,36 @@ app.get("/api/stats", auth, ah(async (req, res) => {
   const prior = recapFor(prevMonthDate.getUTCFullYear(), prevMonthDate.getUTCMonth());
   recap.priorTopMood = prior.topMood;
 
-  res.json({ currentStreak, longestStreak, totalLogged: loggedDays.size, recap });
+  // ---- Habit ↔ mood correlation (across all logged days that have a mood) ----
+  // For each habit: % of "good" (happy/content) days when you did it vs when you
+  // didn't. Only surfaced once there's enough signal (>= 3 days each side).
+  const moodDays = all.filter((e) => MOOD_KEYS.includes(e.mood));
+  const habits = [];
+  for (const act of ACTIVITIES) {
+    const withDays = moodDays.filter((e) => (e.activities || []).includes(act.key));
+    const withoutDays = moodDays.filter((e) => !(e.activities || []).includes(act.key));
+    if (withDays.length < 3 || withoutDays.length < 3) continue;
+    const pct = (list) =>
+      Math.round(
+        (list.filter((e) => POSITIVE_MOODS.includes(e.mood)).length / list.length) * 100
+      );
+    const withPct = pct(withDays);
+    const withoutPct = pct(withoutDays);
+    habits.push({
+      key: act.key,
+      label: act.label,
+      emoji: act.emoji,
+      positive: act.positive,
+      withCount: withDays.length,
+      withPositivity: withPct,
+      withoutPositivity: withoutPct,
+      delta: withPct - withoutPct,
+    });
+  }
+  // Strongest signals first.
+  habits.sort((a, b) => Math.abs(b.delta) - Math.abs(a.delta));
+
+  res.json({ currentStreak, longestStreak, totalLogged: loggedDays.size, recap, habits });
 }));
 
 // ---------- Serve the built client (production single-service deploy) ----------
