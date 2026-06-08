@@ -471,6 +471,18 @@ app.get("/api/admin/users", auth, admin, ah(async (_req, res) => {
   );
 }));
 
+// Permanently delete a user (and all their entries) from the admin portal.
+app.delete("/api/admin/users/:id", auth, admin, ah(async (req, res) => {
+  const id = parseInt(req.params.id, 10);
+  if (id === req.user.uid) {
+    return res.status(400).json({ error: "Use Settings to delete your own account." });
+  }
+  const user = await prisma.user.findUnique({ where: { id } });
+  if (!user) return res.status(404).json({ error: "No such user." });
+  await prisma.user.delete({ where: { id } });
+  res.json({ ok: true });
+}));
+
 // Manual password reset for a locked-out user: sets a random temporary password
 // and returns it once so the admin can relay it. The user changes it after login.
 app.post("/api/admin/users/:id/reset-password", auth, admin, ah(async (req, res) => {

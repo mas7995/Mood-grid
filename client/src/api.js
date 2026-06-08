@@ -32,6 +32,7 @@ export const api = {
   adminUsers: () => request("GET", "/api/admin/users"),
   adminResetPassword: (id) =>
     request("POST", `/api/admin/users/${id}/reset-password`),
+  adminDeleteUser: (id) => request("DELETE", `/api/admin/users/${id}`),
   entries: (year) => request("GET", `/api/entries?year=${year}`),
   saveEntry: (date, mood, note, activities) =>
     request("PUT", `/api/entries/${date}`, { mood, note, activities }),

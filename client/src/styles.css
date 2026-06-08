@@ -736,6 +736,20 @@ button {
   background: var(--bg);
 }
 
+.mini-btn.danger {
+  border-color: #e0473e;
+  color: #c0392b;
+}
+
+.mini-btn.danger:hover {
+  background: #fdeceb;
+}
+
+.row-actions {
+  display: flex;
+  gap: 0.4rem;
+}
+
 .reset-banner code {
   background: #fff;
   padding: 0.1rem 0.4rem;

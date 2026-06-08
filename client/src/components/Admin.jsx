@@ -19,6 +19,23 @@ export default function Admin() {
     }
   }
 
+  async function deleteUser(u) {
+    if (
+      !window.confirm(
+        `Permanently delete ${u.email} and all their data? This cannot be undone.`
+      )
+    )
+      return;
+    try {
+      await api.adminDeleteUser(u.id);
+      const [o, us] = await Promise.all([api.adminOverview(), api.adminUsers()]);
+      setOverview(o);
+      setUsers(us);
+    } catch (e) {
+      setError(e.message);
+    }
+  }
+
   async function downloadBackup() {
     try {
       const res = await fetch("/api/admin/backup", { credentials: "same-origin" });
@@ -127,9 +144,15 @@ export default function Admin() {
                 <td>{new Date(u.createdAt).toLocaleDateString()}</td>
                 <td>{u.entryCount}</td>
                 <td>{u.lastEntry || "—"}</td>
-                <td>
+                <td className="row-actions">
                   <button className="mini-btn" onClick={() => resetPassword(u)}>
                     Reset password
+                  </button>
+                  <button
+                    className="mini-btn danger"
+                    onClick={() => deleteUser(u)}
+                  >
+                    Delete
                   </button>
                 </td>
               </tr>
