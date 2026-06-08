@@ -7,6 +7,17 @@ export default function Admin() {
   const [overview, setOverview] = useState(null);
   const [users, setUsers] = useState(null);
   const [error, setError] = useState("");
+  const [resetInfo, setResetInfo] = useState(null); // { email, tempPassword }
+
+  async function resetPassword(u) {
+    if (!window.confirm(`Reset the password for ${u.email}?`)) return;
+    try {
+      const r = await api.adminResetPassword(u.id);
+      setResetInfo(r);
+    } catch (e) {
+      setError(e.message);
+    }
+  }
 
   useEffect(() => {
     Promise.all([api.adminOverview(), api.adminUsers()])
@@ -64,6 +75,13 @@ export default function Admin() {
       </div>
 
       <h3>Users ({users.length})</h3>
+      {resetInfo && (
+        <p className="settings-ok reset-banner">
+          Temporary password for <strong>{resetInfo.email}</strong>:{" "}
+          <code>{resetInfo.tempPassword}</code> — send this to them; they can change
+          it in Settings after signing in.
+        </p>
+      )}
       <div className="admin-table-wrap">
         <table className="admin-table">
           <thead>
@@ -73,6 +91,7 @@ export default function Admin() {
               <th>Joined</th>
               <th>Entries</th>
               <th>Last entry</th>
+              <th></th>
             </tr>
           </thead>
           <tbody>
@@ -83,6 +102,11 @@ export default function Admin() {
                 <td>{new Date(u.createdAt).toLocaleDateString()}</td>
                 <td>{u.entryCount}</td>
                 <td>{u.lastEntry || "—"}</td>
+                <td>
+                  <button className="mini-btn" onClick={() => resetPassword(u)}>
+                    Reset password
+                  </button>
+                </td>
               </tr>
             ))}
           </tbody>

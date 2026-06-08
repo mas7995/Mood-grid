@@ -6,6 +6,7 @@ import Today from "./components/Today.jsx";
 import YearGrid from "./components/YearGrid.jsx";
 import Recap from "./components/Recap.jsx";
 import Admin from "./components/Admin.jsx";
+import Settings from "./components/Settings.jsx";
 
 export default function App() {
   const [user, setUser] = useState(undefined); // undefined = loading, null = signed out
@@ -94,6 +95,7 @@ export default function App() {
           ["grid", "Grid"],
           ["recap", "Recap"],
           ...(user.isAdmin ? [["admin", "Admin"]] : []),
+          ["settings", "Settings"],
         ].map(([id, label]) => (
           <button
             key={id}
@@ -152,6 +154,10 @@ export default function App() {
         )}
 
         {tab === "admin" && user.isAdmin && <Admin />}
+
+        {tab === "settings" && (
+          <Settings user={user} onSignedOut={handleLogout} />
+        )}
       </main>
     </div>
   );

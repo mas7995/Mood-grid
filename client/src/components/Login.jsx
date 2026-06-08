@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { api } from "../api.js";
+import Privacy from "./Privacy.jsx";
 
 // Email + password auth, with a sign in / create account toggle.
 export default function Login({ onAuthed }) {
@@ -7,6 +8,8 @@ export default function Login({ onAuthed }) {
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [consent, setConsent] = useState(false);
+  const [showPrivacy, setShowPrivacy] = useState(false);
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
 
@@ -15,6 +18,10 @@ export default function Login({ onAuthed }) {
   async function submit(e) {
     e.preventDefault();
     setError("");
+    if (isSignup && !consent) {
+      setError("Please agree to the privacy policy to create an account.");
+      return;
+    }
     setBusy(true);
     try {
       const user = isSignup
@@ -26,6 +33,19 @@ export default function Login({ onAuthed }) {
     } finally {
       setBusy(false);
     }
+  }
+
+  if (showPrivacy) {
+    return (
+      <div className="auth-wrap">
+        <div className="auth-card privacy-card">
+          <Privacy />
+          <button className="primary-btn" onClick={() => setShowPrivacy(false)}>
+            Back
+          </button>
+        </div>
+      </div>
+    );
   }
 
   return (
@@ -73,12 +93,37 @@ export default function Login({ onAuthed }) {
             />
           </label>
 
+          {isSignup && (
+            <label className="consent">
+              <input
+                type="checkbox"
+                checked={consent}
+                onChange={(e) => setConsent(e.target.checked)}
+              />
+              <span>
+                I agree to the{" "}
+                <button
+                  type="button"
+                  className="inline-link"
+                  onClick={() => setShowPrivacy(true)}
+                >
+                  privacy policy
+                </button>
+                .
+              </span>
+            </label>
+          )}
+
           {error && <p className="auth-error">{error}</p>}
 
           <button className="primary-btn" type="submit" disabled={busy}>
             {busy ? "…" : isSignup ? "Create account" : "Sign in"}
           </button>
         </form>
+
+        <button className="link-btn" onClick={() => setShowPrivacy(true)}>
+          Privacy policy
+        </button>
 
         <button
           className="link-btn"

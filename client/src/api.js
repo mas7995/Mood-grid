@@ -25,8 +25,13 @@ export const api = {
     request("POST", "/api/signup", { name, email, password }),
   login: (email, password) => request("POST", "/api/login", { email, password }),
   logout: () => request("POST", "/api/logout"),
+  changePassword: (currentPassword, newPassword) =>
+    request("POST", "/api/account/password", { currentPassword, newPassword }),
+  deleteAccount: () => request("DELETE", "/api/account"),
   adminOverview: () => request("GET", "/api/admin/overview"),
   adminUsers: () => request("GET", "/api/admin/users"),
+  adminResetPassword: (id) =>
+    request("POST", `/api/admin/users/${id}/reset-password`),
   entries: (year) => request("GET", `/api/entries?year=${year}`),
   saveEntry: (date, mood, note, activities) =>
     request("PUT", `/api/entries/${date}`, { mood, note, activities }),

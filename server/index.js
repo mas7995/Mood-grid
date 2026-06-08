@@ -1,8 +1,10 @@
 // The Mood Grid — Express API + static host for the built React client.
 const path = require("path");
+const crypto = require("crypto");
 const express = require("express");
 const cookieParser = require("cookie-parser");
 const rateLimit = require("express-rate-limit");
+const helmet = require("helmet");
 const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
 const { PrismaClient } = require("@prisma/client");
@@ -13,6 +15,25 @@ const app = express();
 // Railway runs the app behind a proxy; trust it so rate limiting keys on the
 // real client IP and secure cookies work.
 app.set("trust proxy", 1);
+
+// Security headers. CSP allows same-origin assets and React's inline styles.
+app.use(
+  helmet({
+    contentSecurityPolicy: {
+      directives: {
+        defaultSrc: ["'self'"],
+        scriptSrc: ["'self'"],
+        styleSrc: ["'self'", "'unsafe-inline'"],
+        imgSrc: ["'self'", "data:"],
+        connectSrc: ["'self'"],
+        objectSrc: ["'none'"],
+        baseUri: ["'self'"],
+        frameAncestors: ["'self'"],
+      },
+    },
+    crossOriginEmbedderPolicy: false,
+  })
+);
 
 const PORT = process.env.PORT || 3000;
 const JWT_SECRET = process.env.JWT_SECRET || "dev-insecure-secret-change-me";
@@ -45,6 +66,18 @@ const ACTIVITY_KEYS = ACTIVITIES.map((a) => a.key);
 
 app.use(express.json());
 app.use(cookieParser());
+
+// A broad ceiling on API traffic per IP (normal use is well under this).
+app.use(
+  "/api",
+  rateLimit({
+    windowMs: 15 * 60 * 1000,
+    max: 600,
+    standardHeaders: true,
+    legacyHeaders: false,
+    message: { error: "Too many requests. Please slow down and try again shortly." },
+  })
+);
 
 // ---------- Helpers ----------
 function setSession(res, user) {
@@ -173,6 +206,31 @@ app.get("/api/me", auth, (req, res) => {
     isAdmin: isAdminEmail(req.user.email),
   });
 });
+
+// ---------- Account management ----------
+app.post("/api/account/password", auth, ah(async (req, res) => {
+  const { currentPassword, newPassword } = req.body || {};
+  if (String(newPassword || "").length < 8) {
+    return res.status(400).json({ error: "New password must be at least 8 characters." });
+  }
+  const user = await prisma.user.findUnique({ where: { id: req.user.uid } });
+  const ok = user?.passwordHash
+    ? await bcrypt.compare(String(currentPassword || ""), user.passwordHash)
+    : false;
+  if (!ok) return res.status(401).json({ error: "Current password is incorrect." });
+  await prisma.user.update({
+    where: { id: user.id },
+    data: { passwordHash: await bcrypt.hash(String(newPassword), 10) },
+  });
+  res.json({ ok: true });
+}));
+
+// Permanently delete the signed-in user's account and all their entries.
+app.delete("/api/account", auth, ah(async (req, res) => {
+  await prisma.user.delete({ where: { id: req.user.uid } }).catch(() => {});
+  res.clearCookie("mg_session");
+  res.json({ ok: true });
+}));
 
 // ---------- Entry routes ----------
 app.get("/api/entries", auth, ah(async (req, res) => {
@@ -411,6 +469,20 @@ app.get("/api/admin/users", auth, admin, ah(async (_req, res) => {
       lastEntry: byUser[u.id]?.lastEntry ? ymd(byUser[u.id].lastEntry) : null,
     }))
   );
+}));
+
+// Manual password reset for a locked-out user: sets a random temporary password
+// and returns it once so the admin can relay it. The user changes it after login.
+app.post("/api/admin/users/:id/reset-password", auth, admin, ah(async (req, res) => {
+  const id = parseInt(req.params.id, 10);
+  const user = await prisma.user.findUnique({ where: { id } });
+  if (!user) return res.status(404).json({ error: "No such user." });
+  const tempPassword = crypto.randomBytes(6).toString("base64url"); // ~8 chars
+  await prisma.user.update({
+    where: { id },
+    data: { passwordHash: await bcrypt.hash(tempPassword, 10) },
+  });
+  res.json({ email: user.email, tempPassword });
 }));
 
 // ---------- Serve the built client (production single-service deploy) ----------
