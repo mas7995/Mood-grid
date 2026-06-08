@@ -753,7 +753,19 @@ button {
 }
 
 .admin-card h2 {
-  margin: 0 0 1rem;
+  margin: 0;
+}
+
+.admin-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.backup-hint {
+  margin: 0.4rem 0 1rem;
+  font-size: 0.8rem;
 }
 
 .admin-card h3 {

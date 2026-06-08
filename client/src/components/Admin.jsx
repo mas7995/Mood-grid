@@ -19,6 +19,22 @@ export default function Admin() {
     }
   }
 
+  async function downloadBackup() {
+    try {
+      const res = await fetch("/api/admin/backup", { credentials: "same-origin" });
+      if (!res.ok) throw new Error("Backup failed.");
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `mood-grid-backup-${new Date().toISOString().slice(0, 10)}.json`;
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch (e) {
+      setError(e.message);
+    }
+  }
+
   useEffect(() => {
     Promise.all([api.adminOverview(), api.adminUsers()])
       .then(([o, u]) => {
@@ -38,7 +54,16 @@ export default function Admin() {
 
   return (
     <section className="admin-card">
-      <h2>Admin</h2>
+      <div className="admin-head">
+        <h2>Admin</h2>
+        <button className="tool-btn" onClick={downloadBackup}>
+          ⬇ Download backup
+        </button>
+      </div>
+      <p className="muted backup-hint">
+        Save a backup file to your computer regularly (e.g. weekly). It's your
+        recovery copy of all data.
+      </p>
 
       <div className="admin-stats">
         {[

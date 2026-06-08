@@ -485,6 +485,22 @@ app.post("/api/admin/users/:id/reset-password", auth, admin, ah(async (req, res)
   res.json({ email: user.email, tempPassword });
 }));
 
+// Full database export (admin-only). A free, downloadable backup the owner can
+// save anywhere; everything needed to restore is included.
+app.get("/api/admin/backup", auth, admin, ah(async (_req, res) => {
+  const [users, entries] = await Promise.all([
+    prisma.user.findMany(),
+    prisma.entry.findMany(),
+  ]);
+  const dump = { version: 1, exportedAt: new Date().toISOString(), users, entries };
+  res.setHeader("Content-Type", "application/json");
+  res.setHeader(
+    "Content-Disposition",
+    `attachment; filename="mood-grid-backup-${ymd(new Date())}.json"`
+  );
+  res.send(JSON.stringify(dump, null, 2));
+}));
+
 // ---------- Serve the built client (production single-service deploy) ----------
 const clientDist = path.join(__dirname, "..", "client", "dist");
 app.use(express.static(clientDist));
