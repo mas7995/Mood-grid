@@ -21,10 +21,12 @@ async function request(method, url, body) {
 
 export const api = {
   me: () => request("GET", "/api/me"),
-  listProfiles: () => request("GET", "/api/profiles"),
-  createProfile: (name, pin) => request("POST", "/api/profiles", { name, pin }),
-  login: (name, pin) => request("POST", "/api/login", { name, pin }),
+  signup: (name, email, password) =>
+    request("POST", "/api/signup", { name, email, password }),
+  login: (email, password) => request("POST", "/api/login", { email, password }),
   logout: () => request("POST", "/api/logout"),
+  adminOverview: () => request("GET", "/api/admin/overview"),
+  adminUsers: () => request("GET", "/api/admin/users"),
   entries: (year) => request("GET", `/api/entries?year=${year}`),
   saveEntry: (date, mood, note, activities) =>
     request("PUT", `/api/entries/${date}`, { mood, note, activities }),

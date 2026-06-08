@@ -2,6 +2,7 @@
 const path = require("path");
 const express = require("express");
 const cookieParser = require("cookie-parser");
+const rateLimit = require("express-rate-limit");
 const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
 const { PrismaClient } = require("@prisma/client");
@@ -9,9 +10,21 @@ const { PrismaClient } = require("@prisma/client");
 const prisma = new PrismaClient();
 const app = express();
 
+// Railway runs the app behind a proxy; trust it so rate limiting keys on the
+// real client IP and secure cookies work.
+app.set("trust proxy", 1);
+
 const PORT = process.env.PORT || 3000;
 const JWT_SECRET = process.env.JWT_SECRET || "dev-insecure-secret-change-me";
 const isProd = process.env.NODE_ENV === "production";
+
+// Admin allowlist — comma-separated emails in the ADMIN_EMAILS env var.
+const ADMIN_EMAILS = (process.env.ADMIN_EMAILS || "")
+  .split(",")
+  .map((e) => e.trim().toLowerCase())
+  .filter(Boolean);
+const isAdminEmail = (email) =>
+  !!email && ADMIN_EMAILS.includes(String(email).toLowerCase());
 
 // The six moods are the single source of truth for what the server will accept.
 const MOOD_KEYS = ["happy", "content", "neutral", "sad", "angry", "overwhelmed"];
@@ -35,9 +48,11 @@ app.use(cookieParser());
 
 // ---------- Helpers ----------
 function setSession(res, user) {
-  const token = jwt.sign({ uid: user.id, name: user.name }, JWT_SECRET, {
-    expiresIn: "180d",
-  });
+  const token = jwt.sign(
+    { uid: user.id, name: user.name, email: user.email },
+    JWT_SECRET,
+    { expiresIn: "180d" }
+  );
   res.cookie("mg_session", token, {
     httpOnly: true,
     sameSite: "lax",
@@ -56,6 +71,22 @@ function auth(req, res, next) {
     res.status(401).json({ error: "Session expired" });
   }
 }
+
+function admin(req, res, next) {
+  if (!isAdminEmail(req.user?.email)) {
+    return res.status(403).json({ error: "Admins only." });
+  }
+  next();
+}
+
+// Throttle auth attempts to blunt brute-force / enumeration.
+const authLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 20,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: "Too many attempts. Please wait a few minutes and try again." },
+});
 
 // Wrap async route handlers so a rejected promise (e.g. a DB error) is forwarded
 // to the error middleware instead of crashing the process.
@@ -80,47 +111,53 @@ function serializeEntry(e) {
   };
 }
 
-// ---------- Profile + auth routes ----------
-app.post("/api/profiles", ah(async (req, res) => {
-  const { name, pin } = req.body || {};
-  if (!name || !String(name).trim()) {
-    return res.status(400).json({ error: "A name is required." });
+// ---------- Auth routes (email + password) ----------
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+const meShape = (user) => ({
+  id: user.id,
+  name: user.name,
+  email: user.email,
+  isAdmin: isAdminEmail(user.email),
+});
+
+app.post("/api/signup", authLimiter, ah(async (req, res) => {
+  const { name, email, password } = req.body || {};
+  const cleanName = String(name || "").trim();
+  const cleanEmail = String(email || "").trim().toLowerCase();
+  if (!cleanName) return res.status(400).json({ error: "Please enter your name." });
+  if (!EMAIL_RE.test(cleanEmail)) {
+    return res.status(400).json({ error: "Please enter a valid email address." });
   }
-  if (!/^\d{4,8}$/.test(String(pin || ""))) {
-    return res.status(400).json({ error: "PIN must be 4–8 digits." });
+  if (String(password || "").length < 8) {
+    return res.status(400).json({ error: "Password must be at least 8 characters." });
   }
-  const cleanName = String(name).trim();
-  const existing = await prisma.user.findUnique({ where: { name: cleanName } });
+  const existing = await prisma.user.findUnique({ where: { email: cleanEmail } });
   if (existing) {
-    return res.status(409).json({ error: "That name is already taken." });
+    return res.status(409).json({ error: "An account with that email already exists." });
   }
-  const pinHash = await bcrypt.hash(String(pin), 10);
-  const user = await prisma.user.create({ data: { name: cleanName, pinHash } });
-  setSession(res, user);
-  res.status(201).json({ id: user.id, name: user.name });
-}));
-
-// Names only — never expose PIN hashes.
-app.get("/api/profiles", ah(async (_req, res) => {
-  const users = await prisma.user.findMany({
-    select: { name: true },
-    orderBy: { name: "asc" },
+  const passwordHash = await bcrypt.hash(String(password), 10);
+  const user = await prisma.user.create({
+    data: { name: cleanName, email: cleanEmail, passwordHash },
   });
-  res.json(users.map((u) => u.name));
+  setSession(res, user);
+  res.status(201).json(meShape(user));
 }));
 
-app.post("/api/login", ah(async (req, res) => {
-  const { name, pin } = req.body || {};
-  const user = await prisma.user.findUnique({ where: { name: String(name || "").trim() } });
+app.post("/api/login", authLimiter, ah(async (req, res) => {
+  const { email, password } = req.body || {};
+  const cleanEmail = String(email || "").trim().toLowerCase();
+  const user = cleanEmail
+    ? await prisma.user.findUnique({ where: { email: cleanEmail } })
+    : null;
   // Always run a compare to keep timing roughly constant whether or not the user exists.
-  const ok = user
-    ? await bcrypt.compare(String(pin || ""), user.pinHash)
+  const ok = user?.passwordHash
+    ? await bcrypt.compare(String(password || ""), user.passwordHash)
     : await bcrypt.compare("x", "$2a$10$invalidinvalidinvalidinvalidinvalidinvalidinv");
   if (!user || !ok) {
-    return res.status(401).json({ error: "Wrong name or PIN." });
+    return res.status(401).json({ error: "Wrong email or password." });
   }
   setSession(res, user);
-  res.json({ id: user.id, name: user.name });
+  res.json(meShape(user));
 }));
 
 app.post("/api/logout", (_req, res) => {
@@ -129,7 +166,12 @@ app.post("/api/logout", (_req, res) => {
 });
 
 app.get("/api/me", auth, (req, res) => {
-  res.json({ id: req.user.uid, name: req.user.name });
+  res.json({
+    id: req.user.uid,
+    name: req.user.name,
+    email: req.user.email,
+    isAdmin: isAdminEmail(req.user.email),
+  });
 });
 
 // ---------- Entry routes ----------
@@ -304,6 +346,71 @@ app.get("/api/stats", auth, ah(async (req, res) => {
   habits.sort((a, b) => Math.abs(b.delta) - Math.abs(a.delta));
 
   res.json({ currentStreak, longestStreak, totalLogged: loggedDays.size, recap, habits });
+}));
+
+// ---------- Admin (aggregate only — never exposes private notes/moods) ----------
+app.get("/api/admin/overview", auth, admin, ah(async (_req, res) => {
+  const dayMs = 86400000;
+  const since7 = new Date(Date.now() - 7 * dayMs);
+  const since30 = new Date(Date.now() - 30 * dayMs);
+
+  const [totalUsers, totalEntries, newUsers7d, newUsers30d, moodGroups, recentEntryUsers] =
+    await Promise.all([
+      prisma.user.count(),
+      prisma.entry.count(),
+      prisma.user.count({ where: { createdAt: { gte: since7 } } }),
+      prisma.user.count({ where: { createdAt: { gte: since30 } } }),
+      prisma.entry.groupBy({
+        by: ["mood"],
+        where: { mood: { not: null } },
+        _count: { mood: true },
+      }),
+      prisma.entry.findMany({
+        where: { createdAt: { gte: since7 } },
+        select: { userId: true },
+        distinct: ["userId"],
+      }),
+    ]);
+
+  const moodDistribution = Object.fromEntries(MOOD_KEYS.map((k) => [k, 0]));
+  for (const g of moodGroups) {
+    if (moodDistribution[g.mood] != null) moodDistribution[g.mood] = g._count.mood;
+  }
+
+  res.json({
+    totalUsers,
+    totalEntries,
+    newUsers7d,
+    newUsers30d,
+    activeUsers7d: recentEntryUsers.length,
+    moodDistribution,
+  });
+}));
+
+app.get("/api/admin/users", auth, admin, ah(async (_req, res) => {
+  const users = await prisma.user.findMany({
+    select: { id: true, name: true, email: true, createdAt: true },
+    orderBy: { createdAt: "desc" },
+    take: 500,
+  });
+  const counts = await prisma.entry.groupBy({
+    by: ["userId"],
+    _count: { _all: true },
+    _max: { entryDate: true },
+  });
+  const byUser = Object.fromEntries(
+    counts.map((c) => [c.userId, { entries: c._count._all, lastEntry: c._max.entryDate }])
+  );
+  res.json(
+    users.map((u) => ({
+      id: u.id,
+      name: u.name,
+      email: u.email,
+      createdAt: u.createdAt,
+      entryCount: byUser[u.id]?.entries || 0,
+      lastEntry: byUser[u.id]?.lastEntry ? ymd(byUser[u.id].lastEntry) : null,
+    }))
+  );
 }));
 
 // ---------- Serve the built client (production single-service deploy) ----------

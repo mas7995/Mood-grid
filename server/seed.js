@@ -7,13 +7,14 @@ const MOODS = ["happy", "content", "neutral", "sad", "angry", "overwhelmed"];
 
 async function main() {
   const name = "Demo";
-  const pin = "1234";
-  const pinHash = await bcrypt.hash(pin, 10);
+  const email = "demo@example.com";
+  const password = "password";
+  const passwordHash = await bcrypt.hash(password, 10);
 
   const user = await prisma.user.upsert({
-    where: { name },
+    where: { email },
     update: {},
-    create: { name, pinHash },
+    create: { name, email, passwordHash },
   });
 
   // Log moods for the last 14 days.
@@ -30,7 +31,7 @@ async function main() {
     });
   }
 
-  console.log(`Seeded profile "${name}" (PIN ${pin}) with 14 days of moods.`);
+  console.log(`Seeded account ${email} (password "${password}") with 14 days of moods.`);
 }
 
 main()

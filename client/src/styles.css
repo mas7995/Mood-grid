@@ -609,6 +609,76 @@ button {
   background: #fdeceb;
 }
 
+/* ---------- Admin ---------- */
+.admin-card {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  padding: 1.4rem;
+}
+
+.admin-card h2 {
+  margin: 0 0 1rem;
+}
+
+.admin-card h3 {
+  margin: 1.5rem 0 0.75rem;
+}
+
+.admin-stats {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+  gap: 0.8rem;
+}
+
+.admin-stat {
+  background: var(--bg);
+  border-radius: 12px;
+  padding: 1rem 0.5rem;
+  text-align: center;
+}
+
+.admin-stat-num {
+  display: block;
+  font-size: 1.6rem;
+  font-weight: 700;
+}
+
+.admin-stat-label {
+  font-size: 0.72rem;
+  color: var(--muted);
+}
+
+.admin-table-wrap {
+  overflow-x: auto;
+}
+
+.admin-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.85rem;
+  min-width: 460px;
+}
+
+.admin-table th,
+.admin-table td {
+  text-align: left;
+  padding: 0.5rem 0.6rem;
+  border-bottom: 1px solid var(--line);
+  white-space: nowrap;
+}
+
+.admin-table th {
+  color: var(--muted);
+  font-weight: 600;
+}
+
+.admin-note {
+  margin-top: 1rem;
+  font-size: 0.8rem;
+}
+
 @media (max-width: 520px) {
   .mood-circles {
     grid-template-columns: repeat(2, 1fr);

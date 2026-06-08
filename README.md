@@ -10,10 +10,14 @@ in a real database so it stays intact across devices and across redeploys.
 
 ## Features
 
-- **PIN login** with a profile picker and first-run create-profile flow. Multiple
-  people can each track with their own PIN.
-- **Today check-in** — six large tappable mood circles plus an optional one-line
-  reflection note. One entry per day, fully editable (backfill past days too).
+- **Email + password accounts** with rate-limited login/signup (safe for public
+  use). Passwords are bcrypt-hashed; the session is a JWT in an httpOnly cookie.
+- **Admin dashboard** (in-app, owner-only) showing aggregate usage — total users,
+  entries, signups, active users, and overall mood distribution. Never exposes
+  any individual's private notes or moods. Gated by the `ADMIN_EMAILS` env var.
+- **Today check-in** — six large tappable mood circles, daily habit check-ins,
+  plus an optional one-line reflection note. One entry per day, fully editable
+  (backfill past days too).
 - **Year grid** — the signature worksheet view. Full year on desktop; single
   month on mobile with a toggle to the full-year scroll.
 - **Streaks** — current and longest consecutive-day streaks.
@@ -92,6 +96,8 @@ that matters.
    - `DATABASE_URL` → reference the Postgres plugin's variable so they stay linked.
    - `JWT_SECRET` → a long random string.
    - `NODE_ENV` → `production`.
+   - `ADMIN_EMAILS` → your email (comma-separated for more than one). These
+     accounts see the in-app **Admin** tab.
 4. **Build & start commands.** These are committed in `railway.json`, so Railway
    uses them automatically. If you prefer to set them by hand (Settings → Build
    and Deploy), they are:

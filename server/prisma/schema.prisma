@@ -11,11 +11,13 @@ datasource db {
 }
 
 model User {
-  id        Int      @id @default(autoincrement())
-  name      String   @unique
-  pinHash   String   @map("pin_hash")
-  createdAt DateTime @default(now()) @map("created_at")
-  entries   Entry[]
+  id           Int      @id @default(autoincrement())
+  name         String
+  email        String?  @unique
+  passwordHash String?  @map("password_hash")
+  pinHash      String?  @map("pin_hash")
+  createdAt    DateTime @default(now()) @map("created_at")
+  entries      Entry[]
 
   @@map("users")
 }

@@ -1,35 +1,25 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { api } from "../api.js";
 
-// Profile picker + PIN, with a first-run "create profile" flow.
+// Email + password auth, with a sign in / create account toggle.
 export default function Login({ onAuthed }) {
-  const [profiles, setProfiles] = useState([]);
-  const [mode, setMode] = useState("login"); // "login" | "create"
+  const [mode, setMode] = useState("login"); // "login" | "signup"
   const [name, setName] = useState("");
-  const [pin, setPin] = useState("");
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
 
-  useEffect(() => {
-    api
-      .listProfiles()
-      .then((list) => {
-        setProfiles(list);
-        if (list.length === 0) setMode("create");
-        else setName(list[0]);
-      })
-      .catch(() => setMode("create"));
-  }, []);
+  const isSignup = mode === "signup";
 
   async function submit(e) {
     e.preventDefault();
     setError("");
     setBusy(true);
     try {
-      const user =
-        mode === "create"
-          ? await api.createProfile(name.trim(), pin)
-          : await api.login(name, pin);
+      const user = isSignup
+        ? await api.signup(name.trim(), email.trim(), password)
+        : await api.login(email.trim(), password);
       onAuthed(user);
     } catch (err) {
       setError(err.message);
@@ -48,18 +38,7 @@ export default function Login({ onAuthed }) {
         </p>
 
         <form onSubmit={submit}>
-          {mode === "login" && profiles.length > 0 ? (
-            <label className="field">
-              <span>Profile</span>
-              <select value={name} onChange={(e) => setName(e.target.value)}>
-                {profiles.map((p) => (
-                  <option key={p} value={p}>
-                    {p}
-                  </option>
-                ))}
-              </select>
-            </label>
-          ) : (
+          {isSignup && (
             <label className="field">
               <span>Name</span>
               <input
@@ -73,21 +52,31 @@ export default function Login({ onAuthed }) {
           )}
 
           <label className="field">
-            <span>PIN</span>
+            <span>Email</span>
+            <input
+              type="email"
+              autoComplete="email"
+              value={email}
+              placeholder="you@example.com"
+              onChange={(e) => setEmail(e.target.value)}
+            />
+          </label>
+
+          <label className="field">
+            <span>Password</span>
             <input
               type="password"
-              inputMode="numeric"
-              pattern="\d*"
-              value={pin}
-              placeholder="4–8 digits"
-              onChange={(e) => setPin(e.target.value.replace(/\D/g, "").slice(0, 8))}
+              autoComplete={isSignup ? "new-password" : "current-password"}
+              value={password}
+              placeholder={isSignup ? "At least 8 characters" : "Your password"}
+              onChange={(e) => setPassword(e.target.value)}
             />
           </label>
 
           {error && <p className="auth-error">{error}</p>}
 
           <button className="primary-btn" type="submit" disabled={busy}>
-            {busy ? "…" : mode === "create" ? "Create profile" : "Sign in"}
+            {busy ? "…" : isSignup ? "Create account" : "Sign in"}
           </button>
         </form>
 
@@ -95,14 +84,12 @@ export default function Login({ onAuthed }) {
           className="link-btn"
           onClick={() => {
             setError("");
-            setMode(mode === "create" ? "login" : "create");
+            setMode(isSignup ? "login" : "signup");
           }}
         >
-          {mode === "create"
-            ? profiles.length > 0
-              ? "Back to sign in"
-              : ""
-            : "Create a new profile"}
+          {isSignup
+            ? "Already have an account? Sign in"
+            : "New here? Create an account"}
         </button>
       </div>
     </div>
